@@ -1,4 +1,4 @@
-# Automatic Stock trading bot (WIP)
+# Chase - Automatic Stock trading bot (WIP)
 
 Inspired by [Gekko](https://github.com/askmike/gekko)
 
@@ -37,9 +37,9 @@ Currently, data is extracted using **quandl** API. It provides following informa
     6. Adjusted values of all above features
     7. Volume
 
-***trader*** uses Adjusted Close`(Adj_Close)` and Volume as direct historical features to be used for forecasting. If you want to use any other feature(s), change the elements of `REL_DATA_COLUMNS`. For example, if you want to use `Open` and `High`, set `REL_DATA_COLUMNS=['Open', 'High']`. 
+***Chase*** uses Adjusted Close`(Adj_Close)` and Volume as direct historical features to be used for forecasting. If you want to use any other feature(s), change the elements of `REL_DATA_COLUMNS`. For example, if you want to use `Open` and `High`, set `REL_DATA_COLUMNS=['Open', 'High']`. 
 
-Apart from this, ***trader*** contains implementations to extract the following features from the data
+Apart from this, ***Chase*** contains implementations to extract the following features from the data
   
     1. Simple Moving Average. -> sma
     2. Exponential Moving Average. -> ema
@@ -65,6 +65,10 @@ found [here](https://github.com/Prakash2403/trader/blob/master/config_doc.md)
 
 ### Engineers who know Machine Learning but not Finance:
 
+***Chase*** offers you a complete playground to test your intuitions regarding hyperparameter settings. I presume you are familier with hyperparameters in keras. Not a single parameter is hardcoded in the core codebase. Every parameter can be altered by changing it's value in `config.py`. 
+
+Moreover, adding new network architecture is as easy as pie. Just inherit the `Network` base class, define the abstract methods and you are good to go.
+
 ### Software Developers: 
 
 Well, it took me some time to design the UML for this project. I tried to stick to 
@@ -81,3 +85,14 @@ been used
     3. Simple moving average (Computed explicitly)
     4. Daily Returns (Computed explicitly)
  
+ ## TODOS
+ 
+    1. Integrate portfolio optimizer in current project.
+    2. Add more flexibility. (make config.py more simple).
+    3. Write the documentation.
+    
+## Current Results
+
+## Who is Chase?
+
+[Adrian Chase - Arrow Season 5 villain](http://arrow.wikia.com/wiki/Adrian_Chase)
