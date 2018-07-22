@@ -6,59 +6,39 @@ from keras.callbacks import EarlyStopping
 from keras.layers import Dense
 from keras.layers import LSTM
 from keras.models import Sequential
-from keras import backend as K_b
-from pandas._libs.tslib import Timestamp #TODO: Change it to datetime
+import matplotlib.pyplot as plt
 
-from errors import DateError
 from utils import *
-from warnings import *
 
 
 class DataHandler:
+    __metaclass__ = abc.ABCMeta
+    pass
 
-    def __init__(self, data, features):
+
+class FinanceDataHandler:
+
+    def __init__(self, data):
         self.data = data
-        self.rel_features = features
-        self.set_relevant_data(features)
         self.min_val = None
         self.max_val = None
-        self.mean_val = None
-        self.std_val = None
-
-    def set_relevant_data(self, features):
-        self.data = self.data[features]
-
-    def normalize_data(self):
-        self.min_val = self.data[self.rel_features[0]].min()
-        self.max_val = self.data[self.rel_features[0]].max()
-        self.data[self.rel_features[0]] = normalize(self.data[self.rel_features[0]], self.min_val, self.max_val)
-
-    def standardize_data(self):
-        self.mean_val = self.data[self.rel_features[0]].mean()
-        self.std_val = self.data[self.rel_features[0]].std()
-        self.data[self.rel_features[0]] = standardize(self.data[self.rel_features[0]], self.mean_val, self.std_val)
-
-    def denormalize_data(self):
-        if self.min_val is None or self.max_val is None:
-            raise DataNotNormalized("Data is not Normalized. ")
-        self.data[self.rel_features[0]] = denormalize(self.data[self.rel_features[0]], self.min_val, self.max_val)
-
-    def destandardize_data(self):
-        if self.mean_val is None or self.std_val is None:
-            raise DataNotNormalized("Data is not Standardized. ")
-        self.data[self.rel_features[0]] = destandardize(self.data[self.rel_features[0]], self.mean_val, self.std_val)
+        self.mean_val = self.data[FEATURE_TO_PREDICT].mean().values
+        self.std_val = self.data[FEATURE_TO_PREDICT].std().values
 
     def save_data(self, filename):
         self.data.to_csv(DATA_DIR + filename)
 
-    def infer_sampling_frequency(self):
-        temp = pd.DataFrame()
-        temp['dt'] = self.data.index
-        temp['shifted'] = (temp['dt'] - temp['dt'].shift())
-        elem, count = np.unique(temp['shifted'], return_counts=True)
-        freq = elem[np.argmax(count)]
-        freq = freq.astype('timedelta64[m]')
-        return freq/np.timedelta64(1, 'm')
+    def preprocess_data(self):
+        for key in EXTRA_FEATURES:
+            self.data[key] = EXTRA_FEATURES[key](self.data, FEATURE_TO_PREDICT)
+        for col in COLUMNS_TO_STANDARDIZE:
+            self.data[col] = standardize(self.data[col])
+        for col in COLUMNS_TO_NORMALIZE:
+            self.data[col] = normalize(self.data[col])
+        for col in CUSTOM_PREPROCESSOR_COLUMNS:
+            for fp in CUSTOM_PREPROCESSOR_FP:
+                self.data[col] = fp(self.data)
+        self.data = self.data.dropna(axis='index')
 
     def __len__(self):
         return self.data.shape[0]
@@ -77,10 +57,6 @@ class Network:
         self.y_test = None
 
     @abc.abstractmethod
-    def preprocess_data(self):
-        pass
-
-    @abc.abstractmethod
     def set_train_test_split(self):
         pass
 
@@ -96,6 +72,10 @@ class Network:
     def forecast_model(self, start_datetime, end_datetime, freq):
         pass
 
+    @abc.abstractmethod
+    def visualize_output(self):
+        pass
+
     def evaluate_model(self):
         return self.model.evaluate(self.X_test, self.y_test)
 
@@ -107,19 +87,12 @@ class Network:
 
 
 class LSTMNetwork(Network):
-
     def __init__(self, data_handler):
         super(LSTMNetwork, self).__init__()
         self.data_handler = data_handler
 
-    def preprocess_data(self, mode='standardize'):
-        if mode == 'standardize':
-            self.data_handler.standardize_data()
-        elif mode == 'normalize':
-            self.data_handler.normalize_data()
-
     def set_train_test_split(self):
-        X, y = window_transform_series(self.data_handler.data, self.data_handler.rel_features[0])
+        X, y = window_transform_series(self.data_handler.data, FEATURE_TO_PREDICT)
         train_test_split = int(np.ceil(LSTM_TRAIN_TEST_SPLIT * len(y)))
 
         self.X_train = X[:train_test_split]
@@ -142,9 +115,7 @@ class LSTMNetwork(Network):
 
     def train_model(self):
         early_stopping = EarlyStopping(monitor=EARLY_STOP_METRIC, patience=LSTM_PATIENCE)
-        K_b.set_session(K_b.tf.Session(config=K_b.tf.ConfigProto(intra_op_parallelism_threads=INTRA_OP_PARALLELISM_THREADS,
-                                                           inter_op_parallelism_threads = INTER_OP_PARALLELISM_THREADS)))
-        self.model.fit(np.asarray(self.X_train), np.asarray(self.y_train),
+        self.model.fit(self.X_train, self.y_train,
                        epochs=LSTM_EPOCHS,
                        batch_size=BATCH_SIZE,
                        verbose=VERBOSE,
@@ -152,33 +123,52 @@ class LSTMNetwork(Network):
                        validation_split=LSTM_VALIDATION_SPLIT)
 
     def forecast_model(self, start_datetime, end_datetime, freq):
-        if freq is None:
-            freq = str(self.data_handler.infer_sampling_frequency()) + 'Min'
+        # if freq is None:
+        #     freq = str(self.data_handler.infer_sampling_frequency()) + 'Min'
         output_list = []
         input_list = self.X_test[-1]
         input_list = np.reshape(input_list, (1, input_list.shape[0], input_list.shape[1]))
-        data_end_datetime = self.data_handler.data.index[-1]
-        if Timestamp(start_datetime) < data_end_datetime:
-            raise DateError("Start datetime is of present or past. Please enter a future datetime.")
-        if end_datetime < start_datetime:
-            raise DateWarning("End time is before start time. No predictions will be made.")
-        date_prediction = pd.date_range(start=start_datetime,
-                                        end=end_datetime, freq=freq)
-        for i in range(len(date_prediction)):
-            predicted_data = self.model.predict(input_list)
-            predicted_data = np.append(predicted_data[0], [date_prediction[i].hour, date_prediction[i].minute])
-            input_list = np.delete(input_list[0], obj=0, axis=0)
-            input_list = np.append(input_list, np.reshape(predicted_data, (1, FEATURE_DIMENSION)), axis=0)
-            input_list = np.asarray(np.reshape(input_list, (1, WINDOW_SIZE, FEATURE_DIMENSION)))
-            output_list.append(predicted_data[0])
+        # data_end_datetime = self.data_handler.data.index[-1]
+        # if Timestamp(start_datetime) < data_end_datetime:
+        #     raise DateError("Start datetime is of present or past. Please enter a future datetime.")
+        # if end_datetime < start_datetime:
+        #     raise DateWarning("End time is before start time. No predictions will be made.")
+        # date_prediction = pd.date_range(start=start_datetime,
+        #                                 end=end_datetime, freq=freq)
+        # print(date_prediction)
+        # for i in range(len(date_prediction)):
+        predicted_data = self.model.predict(input_list)
+        output_list.append(predicted_data[0])
         output_list = destandardize(output_list, self.data_handler.mean_val, self.data_handler.std_val)
-        output_list = pd.DataFrame(index=date_prediction, data=output_list)
-        forecasted_list = pd.DataFrame(index=pd.date_range(start=start_datetime, end=end_datetime, freq=freq))
-        desired_list = forecasted_list.join(output_list)
-        return desired_list
+        return output_list
+        #     predicted_data = np.append(predicted_data[0], [date_prediction[i].hour, date_prediction[i].minute])
+        #     input_list = np.delete(input_list[0], obj=0, axis=0)
+        #     input_list = np.append(input_list, np.reshape(predicted_data, (1, FEATURE_DIMENSION)), axis=0)
+        #     input_list = np.asarray(np.reshape(input_list, (1, WINDOW_SIZE, FEATURE_DIMENSION)))
+        # output_list = pd.DataFrame(index=date_prediction, data=output_list)
+        # forecasted_list = pd.DataFrame(index=pd.date_range(start=start_datetime, end=end_datetime, freq=freq))
+        # desired_list = forecasted_list.join(output_list)
+        # return desired_list
 
-    def run_model(self, weight_filename,  start_datetime, end_datetime, forecast_freq=None, train=False,
-                  evaluate=False):
+    def visualize_output(self):
+        _, y = window_transform_series(self.data_handler.data, FEATURE_TO_PREDICT)
+        train_test_split = int(np.ceil(LSTM_TRAIN_TEST_SPLIT * len(y)))
+        train_predict = self.model.predict(self.X_train)
+        test_predict = self.model.predict(self.X_test)
+        plt.plot(destandardize(self.data_handler.data[FEATURE_TO_PREDICT].values,
+                               self.data_handler.mean_val, self.data_handler.std_val), color='k')
+        split_pt = train_test_split + WINDOW_SIZE
+        plt.plot(np.arange(WINDOW_SIZE, split_pt, 1), destandardize(train_predict, self.data_handler.mean_val,
+                                                                    self.data_handler.std_val), color='b')
+        plt.plot(np.arange(split_pt, split_pt + len(test_predict), 1), destandardize(test_predict,
+                                                                                     self.data_handler.mean_val,
+                                                                                     self.data_handler.std_val),
+                 color='r')
+        plt.legend(['original series', 'training fit', 'testing fit'], loc='center left', bbox_to_anchor=(1, 0.5))
+        plt.show()
+
+    def run_model(self, weight_filename, start_datetime=None, end_datetime=None, forecast_freq=None, train=False,
+                  evaluate=False, visualize=False):
         """
 
         :param weight_filename: Filename containing the required weights for neural network
@@ -188,23 +178,22 @@ class LSTMNetwork(Network):
         the past data, by taking mode of time difference.
         :param train: If true, then train the network. If false, then forecast using given weights.
         :param evaluate: If true, then show the evaluation on test set.
+        :param visualize: If True then plot the train test prediction and actual data on graph.
 
         :return: Pandas dataframe having datetime as index and corresponding forecasted result as values.
         """
-        self.preprocess_data()
+        self.data_handler.preprocess_data()
         self.set_train_test_split()
         self.build_model()
         if train:
             self.train_model()
             self.save_model(weight_filename)
-            print(self.model.evaluate())
         else:
             self.load_model(weight_filename)
         if evaluate:
             s = self.evaluate_model()
-            print(s)  # TODO: SET A LOGGER
+            print(s)
+        if visualize:
+            self.visualize_output()
         out = self.forecast_model(start_datetime=start_datetime, end_datetime=end_datetime, freq=forecast_freq)
-        data = self.data_handler.data
-        out = add_minmax_bound(dataframe=out, feature=self.data_handler.rel_features[0],
-                               grp_std_dev=data.groupby([data.index.hour, data.index.minute]).std())
         return out
