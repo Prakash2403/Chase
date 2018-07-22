@@ -1,6 +1,6 @@
 from datahandler import DataHandler
 from utils import *
-import pandas as pd
+from utils.compute_stock_features import *
 
 
 class StockDataHandler(DataHandler):
@@ -22,6 +22,8 @@ class StockDataHandler(DataHandler):
         self.name = name
 
     def preprocess_data(self):
+        for feature in REL_PREDEFINED_FEATURES:
+            self.data[feature] = eval(feature.lower())(self.data, FEATURE_TO_PREDICT)
         for key in EXTRA_FEATURES:
             self.data[key] = EXTRA_FEATURES[key](self.data, FEATURE_TO_PREDICT)
         for col in COLUMNS_TO_STANDARDIZE:
