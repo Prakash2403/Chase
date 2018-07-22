@@ -9,7 +9,7 @@ MODEL_DIR = PROJECT_DIR + "/models/"
 
 # DATA EXTRACTION, TRANSFORMATION, LOADING
 
-STOCKS = ['EOD/DIS']  # Currently, only one stock is supported, will add support for multiple stock prediction soon :):)
+STOCKS = ['EOD/DIS', 'EOD/BA']
 MODE = 'LOCAL'  # Either local or quandl. Tell the program from where to extract the data.
 SAVE = True  # If mode is "quandl", then save the extracted datasets
 RETRIEVAL_START_DATE = '2016-06-06'  # YYYY-MM-DD
@@ -25,6 +25,8 @@ FEATURE_TO_PREDICT = ['Adj_Close']
 
 # DEFAULT NEURAL NETWORK CONFIGURATION
 
+TRAIN_NETWORK = True
+VISUALIZE = True
 LSTM_OPTIMIZER = 'adam'
 LSTM_EPOCHS = 50
 LSTM_PATIENCE = 15  # Early Stopping

@@ -1,89 +1,11 @@
-# TODO: SET A LOGGER
-
-import abc
-
 from keras.callbacks import EarlyStopping
 from keras.layers import Dense
 from keras.layers import LSTM
 from keras.models import Sequential
 import matplotlib.pyplot as plt
 
+from network import Network
 from utils import *
-
-
-class DataHandler:
-    __metaclass__ = abc.ABCMeta
-    pass
-
-
-class FinanceDataHandler:
-
-    def __init__(self, data):
-        self.data = data
-        self.min_val = None
-        self.max_val = None
-        self.mean_val = self.data[FEATURE_TO_PREDICT].mean().values
-        self.std_val = self.data[FEATURE_TO_PREDICT].std().values
-
-    def save_data(self, filename):
-        self.data.to_csv(DATA_DIR + filename)
-
-    def preprocess_data(self):
-        for key in EXTRA_FEATURES:
-            self.data[key] = EXTRA_FEATURES[key](self.data, FEATURE_TO_PREDICT)
-        for col in COLUMNS_TO_STANDARDIZE:
-            self.data[col] = standardize(self.data[col])
-        for col in COLUMNS_TO_NORMALIZE:
-            self.data[col] = normalize(self.data[col])
-        for col in CUSTOM_PREPROCESSOR_COLUMNS:
-            for fp in CUSTOM_PREPROCESSOR_FP:
-                self.data[col] = fp(self.data)
-        self.data = self.data.dropna(axis='index')
-
-    def __len__(self):
-        return self.data.shape[0]
-
-
-class Network:
-    __metaclass__ = abc.ABCMeta
-
-    @abc.abstractmethod
-    def __init__(self):
-        self.model = None
-        self.model_history = None
-        self.X_train = None
-        self.X_test = None
-        self.y_train = None
-        self.y_test = None
-
-    @abc.abstractmethod
-    def set_train_test_split(self):
-        pass
-
-    @abc.abstractmethod
-    def build_model(self):
-        pass
-
-    @abc.abstractmethod
-    def train_model(self):
-        pass
-
-    @abc.abstractmethod
-    def forecast_model(self, start_datetime, end_datetime, freq):
-        pass
-
-    @abc.abstractmethod
-    def visualize_output(self):
-        pass
-
-    def evaluate_model(self):
-        return self.model.evaluate(self.X_test, self.y_test)
-
-    def save_model(self, filename):
-        self.model.save_weights(MODEL_DIR + filename)
-
-    def load_model(self, filename):
-        self.model.load_weights(MODEL_DIR + filename)
 
 
 class LSTMNetwork(Network):
@@ -92,11 +14,11 @@ class LSTMNetwork(Network):
         self.data_handler = data_handler
 
     def set_train_test_split(self):
-        X, y = window_transform_series(self.data_handler.data, FEATURE_TO_PREDICT)
+        x, y = window_transform_series(self.data_handler.data, FEATURE_TO_PREDICT)
         train_test_split = int(np.ceil(LSTM_TRAIN_TEST_SPLIT * len(y)))
 
-        self.X_train = X[:train_test_split]
-        self.X_test = X[train_test_split:]
+        self.X_train = x[:train_test_split]
+        self.X_test = x[train_test_split:]
 
         self.y_train = y[:train_test_split]
         self.y_test = y[train_test_split:]
@@ -139,7 +61,9 @@ class LSTMNetwork(Network):
         # for i in range(len(date_prediction)):
         predicted_data = self.model.predict(input_list)
         output_list.append(predicted_data[0])
-        output_list = destandardize(output_list, self.data_handler.mean_val, self.data_handler.std_val)
+        mean_val = self.data_handler.rel_stats[FEATURE_TO_PREDICT].loc['mean'].values
+        std_val = self.data_handler.rel_stats[FEATURE_TO_PREDICT].loc['std'].values
+        output_list = destandardize(output_list, mean_val, std_val)
         return output_list
         #     predicted_data = np.append(predicted_data[0], [date_prediction[i].hour, date_prediction[i].minute])
         #     input_list = np.delete(input_list[0], obj=0, axis=0)
@@ -155,15 +79,16 @@ class LSTMNetwork(Network):
         train_test_split = int(np.ceil(LSTM_TRAIN_TEST_SPLIT * len(y)))
         train_predict = self.model.predict(self.X_train)
         test_predict = self.model.predict(self.X_test)
+        mean_val = self.data_handler.rel_stats[FEATURE_TO_PREDICT].loc['mean'].values
+        std_val = self.data_handler.rel_stats[FEATURE_TO_PREDICT].loc['std'].values
         plt.plot(destandardize(self.data_handler.data[FEATURE_TO_PREDICT].values,
-                               self.data_handler.mean_val, self.data_handler.std_val), color='k')
+                               mean_val, std_val), color='k')
         split_pt = train_test_split + WINDOW_SIZE
-        plt.plot(np.arange(WINDOW_SIZE, split_pt, 1), destandardize(train_predict, self.data_handler.mean_val,
-                                                                    self.data_handler.std_val), color='b')
-        plt.plot(np.arange(split_pt, split_pt + len(test_predict), 1), destandardize(test_predict,
-                                                                                     self.data_handler.mean_val,
-                                                                                     self.data_handler.std_val),
-                 color='r')
+        plt.plot(np.arange(WINDOW_SIZE, split_pt, 1), destandardize(train_predict, mean_val, std_val), color='b')
+        plt.plot(np.arange(split_pt, split_pt + len(test_predict), 1), destandardize(test_predict, mean_val, std_val)
+                 , color='r')
+        plt.xlabel(self.data_handler.name)
+        plt.ylabel("Price")
         plt.legend(['original series', 'training fit', 'testing fit'], loc='center left', bbox_to_anchor=(1, 0.5))
         plt.show()
 
