@@ -3,7 +3,7 @@ import numpy as np
 import quandl
 
 from config import *
-from exceptions import UnknownModeException
+from utils.exceptions import UnknownModeException
 
 
 def load_data(filename):
