@@ -21,6 +21,22 @@ Almost everything can be controlled by changing the parameters in `config.py`. N
 
 No tight coupling, proper encapsulations and abstractions ensure that code is flexible and easy to extend. 
 
+## Requirements
+
+### Dependencies
+
+    keras
+    tensorflow
+    quandl
+    pandas
+    numpy
+    matplotlib
+
+### Secrets
+
+To get data using `quandl` API, you need to have an API key. You can find your API key on your Quandl account settings page. Once you have that, create a file named `secrets.txt` in project root directory and save the key as follows:
+{`'quandl_key':'your api key here'}`. **MAKE SURE THAT *quandl_key* and *your API key* ARE ENCLOSED WITHIN SINGLE QUOTE**.
+
 ## Target Audience
 
 ### Traders who know Finance but not Machine Learning or Programming
@@ -93,6 +109,18 @@ been used
     4. Write testcases.
     
 ## Current Results
+
+Actual stock prices are shown in black color. Training fit is shown in blue and testing fit is shown in red.
+
+**The Walt Disney Company**
+![Disney](https://github.com/Prakash2403/trader/blob/master/images/Disney.png)
+
+---
+
+![BA](https://github.com/Prakash2403/trader/blob/master/images/BA.png)
+**Boeing Corporations**
+
+
 
 ## Who is Chase?
 
