@@ -90,6 +90,7 @@ been used
     1. Integrate portfolio optimizer in current project.
     2. Add more flexibility. (make config.py more simple).
     3. Write the documentation.
+    4. Write testcases.
     
 ## Current Results
 
