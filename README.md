@@ -34,8 +34,8 @@ No tight coupling, proper encapsulations and abstractions ensure that code is fl
 
 ### Secrets
 
-To get data using `quandl` API, you need to have an API key. You can find your API key on your Quandl account settings page. Once you have that, create a file named `secrets.txt` in project root directory and save the key as follows:
-{`'quandl_key':'your api key here'}`. **MAKE SURE THAT *quandl_key* and *your API key* ARE ENCLOSED WITHIN SINGLE QUOTE**.
+To get data using `quandl` API, you need to have an API key. You can find your API key on your Quandl account settings page. Once you have that, go to `secrets.txt` in project root directory and save your key there. Finally, secrets.txt should look like `{'quandl_key': 'dffergtrth421321'}`.
+**MAKE SURE THAT *quandl_key* and *your API key* ARE ENCLOSED WITHIN SINGLE QUOTE**.
 
 ## Target Audience
 
