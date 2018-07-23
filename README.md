@@ -21,6 +21,12 @@ Almost everything can be controlled by changing the parameters in `config.py`. N
 
 No tight coupling, proper encapsulations and abstractions ensure that code is flexible and easy to extend. 
 
+## How to run
+    git clone https://github.com/Prakash2403/Chase.git
+    cd Chase
+    pip3 install -r requirements.txt
+    python3 main.py
+
 ## Requirements
 
 ### Dependencies
